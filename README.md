@@ -2,9 +2,9 @@
 
 ## 环境
 
-- java 1.8
-- springboot 2.4.3
-- sharding sphere 4.1.1
+- `java 1.8`
+- `springboot 2.4.3`
+- `sharding sphere 4.1.1`
 
 ## 项目
 
