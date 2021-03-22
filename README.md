@@ -4,7 +4,7 @@
 
 这里以数据分片为背景，使用`sharding sphere jdbc` 来演示他的无侵入式的多租户实现方案。
 
-## 环境
+## 开发环境
 
 - `java 1.8`
 - `springboot 2.4.3`
@@ -12,7 +12,7 @@
 
 ## 核心概念
 
-在数据分片的背景下，`sharding sphere`中设计的核心概念有：
+在`sharding sphere`数据分片的背景下，有如下几个核心概念：
 
 ### 逻辑表
 
@@ -114,7 +114,10 @@ WHERE o.order_id in (10, 11);
 
 以这种方式实现的数据库多租户方案，不同租户间共享数据库实例与`schema`，隔离程度较低。下文详细说明配置和实现。
 
-初始化数据库，这里建立了`t_user_a`和`t_user_b`两张表，这里的表是真实表
+### 数据库
+
+这里建立了`t_user_a`和`t_user_b`两张表，这里的表是真实表
+
 ```sql
 create
 database if not exists sharding_sphere_db0;
@@ -138,7 +141,10 @@ create table t_user_b
     name   varchar(32) null
 );
 ```
-而在程序中则直接操作的是逻辑表`t_user`如下
+### 业务
+
+在应用的业务逻辑中，操作的是逻辑表`t_user`如下（这里以`mybatis`为例）
+
 ```java
 @Mapper
 public interface UserMapper {
@@ -156,7 +162,10 @@ public interface UserMapper {
     void deleteAll();
 }
 ```
+### 配置
+
 使用时在配置文件中指定数据源`db0`，真实节点`db0.t_user_a`、`db0_t_user_b`，同时指定分表键`tenant`
+
 ```properties
 spring.shardingsphere.datasource.names=db0
 spring.shardingsphere.datasource.db0.type=com.alibaba.druid.pool.DruidDataSource
@@ -185,7 +194,10 @@ public class TUserShardingAlgorithm implements PreciseShardingAlgorithm<String> 
     }
 }
 ```
+### 观察分表
+
 启动应用后运行，调用相应接口，运行SQL
+
 ```sql
 insert into t_user (tenant, name) values("a", "I am a");
 insert into t_user (tenant, name) values("b", "I am b");
@@ -197,11 +209,14 @@ insert into t_user_b (tenant, name) values("b", "I am b");
 ```
 实现自动分片策略，查询更新删除等操作有同样效果
 
-### 分库多租户方案
+## 分库多租户方案
 
 以这种方式实现的数据库多租户方案，不同租户间通过不同数据库实例或`schema`隔离，隔离程度较高。下文详细说明配置和实现。
 
-初始化数据库，这里建立了`sharding_sphere_db1`和`sharding_sphere_db2`两个`schema`，并分别在数据库中建立`t_user`表
+### 数据库
+
+这里建立了`sharding_sphere_db1`和`sharding_sphere_db2`两个`schema`，并分别在数据库中建立`t_user`表，目的是希望根据不用的`tanent`字段将数据分片到不同的数据库中。
+
 ```sql
 create database if not exists sharding_sphere_db1;
 create database if not exists sharding_sphere_db2;
@@ -225,7 +240,10 @@ create table t_user
 );
 
 ```
-程序中不关心具体的`t_user`在哪个数据源中
+### 业务
+
+程序中不关心具体的`t_user`在哪个数据源中（实际是以`sharding sphere`代理数据源访问数据库）
+
 ```java
 @Mapper
 public interface UserMapper {
@@ -243,7 +261,10 @@ public interface UserMapper {
     void deleteAll();
 }
 ```
+### 配置
+
 在配置文件中指定数据源`db1`和`db2`，真实节点`db1.t_user`、`db2_t_user`，同时指定分库键`tenant`
+
 ```properties
 spring.shardingsphere.datasource.names=db1,db2
 spring.shardingsphere.datasource.db1.type=com.alibaba.druid.pool.DruidDataSource
@@ -288,15 +309,18 @@ public class DatabaseShardingAlgorithm implements PreciseShardingAlgorithm<Strin
     }
 }
 ```
+### 观察数据分库
+
 启动应用后运行，调用相应接口，运行SQL
+
 ```sql
 insert into t_user (tenant, name) values("a", "I am a");
 insert into t_user (tenant, name) values("b", "I am b");
 ```
 可以观察到，SQL语句会被路由至
 ```sql
-insert into sharding_sphere_db1.t_user_a (tenant, name) values("a", "I am a");
-insert into sharding_sphere_db2.t_user_b (tenant, name) values("b", "I am b");
+insert into sharding_sphere_db1.t_user (tenant, name) values("a", "I am a");
+insert into sharding_sphere_db2.t_user (tenant, name) values("b", "I am b");
 ```
 实现数据的自动分片策略，查询更新删除等操作有同样效果，达到多租户的目的。
 
